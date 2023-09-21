@@ -1,0 +1,20 @@
+# Copyright (c) 2023 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+manifest:
+  self:
+    west-commands: scripts/west-commands.yml
+
+  remotes:
+    - name: ncs
+      url-base: https://github.com/nrfconnect
+
+  projects:
+    - name: nrf
+      remote: ncs
+      repo-path: sdk-nrf
+      revision: 18682391decaaa989c362ec8c5b65fd6203a5fdb
+      import: true
+
+  self:
+    path: nrf5340_qspi_xip_manifest

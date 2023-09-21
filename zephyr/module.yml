@@ -1,0 +1,4 @@
+build:
+  kconfig: Kconfig
+  settings:
+    module_ext_root: .
