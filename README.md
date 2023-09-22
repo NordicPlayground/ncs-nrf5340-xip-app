@@ -1,6 +1,6 @@
 # QSPI XIP with internal flash application support
 
-This repository demonstrates a way of splitting an application for the nRF5340 to partially reside on internal flash and partially on QSPI
+This repository demonstrates a way of splitting an application for the nRF5340 to partially reside on internal flash and partially on QSPI.
 
 ## Requirements
 
@@ -47,7 +47,7 @@ The QSPI flash chip must be correctly setup in the board devicetree file, this i
 };
 ```
 
-Note: Due to YOPAN-159 the QSPI peripheral must be ran with HFCLK192MCTRL=0, setting this to any other value may cause undefined operation of the device.
+**Note:** Due to YOPAN-159 the QSPI peripheral must be ran with HFCLK192MCTRL=0, setting this to any other value may cause undefined operation of the device.
 
 ### Static partition manager:
 
@@ -161,9 +161,9 @@ zephyr_code_relocate(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/bluetooth.c LOCATION 
 
 MCUboot must be configured for 3 images which correspond to:
 
-* 1. Internal flash
-* 2. Network core
-* 3. QSPI flash
+1. Internal flash
+2. Network core
+3. QSPI flash
 
 Partial updates of either the internal flash or QSPI flash are not supported and will likely cause the module to fault, updates of both sections are required when performing a firmware update.
 
