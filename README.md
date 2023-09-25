@@ -228,6 +228,46 @@ You can apply firmware updates using the following methods:
 * Using MCUboot serial recovery, via UART, using the ``*_update.bin`` files.
 * Using Bluetooth LE through the nRF Connect app for iOS or Android by using the ``dfu_application.zip`` file.
 
+### Flashing to external flash in SPI/DSPI mode
+
+When flashing applications using ``west``, this will invoke the ``nrfjprog`` runner.
+This runner will use the system default configuration that will configure the application in the QSPI mode (when flashing the external flash).
+This behavior can be changed using a custom ``Qspi.ini`` configuration file, but this will prevent flashing from being performed using ``west``. A sample ``Qspi.ini`` file is provided in the root of this repository. The file is set up to work on Nordic Thingy:53. If you decide to use the ``Qspi.ini`` file, the HEX files in the repository need to be manually flashed. For example, for the ``zigbee_weather_station`` application, the files to flash are the following (paths are relative to the build directory):
+
+* multiprotocol_rpmsg/zephyr/merged_CPUNET.hex
+* mcuboot/zephyr/zephyr.hex
+* zephyr/internal_flash_signed.hex
+* zephyr/qspi_flash_signed.hex
+
+For the ``smp_svr`` sample application, the files to flash are the following:
+
+* hci_rpmsg/zephyr/merged_CPUNET.hex
+* mcuboot/zephyr/zephyr.hex
+* zephyr/internal_flash_signed.hex
+* zephyr/qspi_flash_signed.hex
+
+The follow commands can be used to flash and verify the application for ``zigbee_weather_station`` (adjusting the path to the ini file):
+
+```
+nrfjprog -f NRF53 --coprocessor CP_NETWORK --sectorerase --program multiprotocol_rpmsg/zephyr/merged_CPUNET.hex --verify
+nrfjprog -f NRF53 --sectorerase --program mcuboot/zephyr/zephyr.hex --verify
+nrfjprog -f NRF53 --sectorerase --program zephyr/internal_flash_signed.hex --verify
+nrfjprog -f NRF53 --qspisectorerase --program zephyr/qspi_flash_signed.hex --qspiini <path_to>/Qspi.ini --verify
+nrfjprog -f NRF53 --reset
+```
+
+The following commands are for the ``smp_svr`` sample:
+
+```
+nrfjprog -f NRF53 --coprocessor CP_NETWORK --sectorerase --program hci_rpmsg/zephyr/merged_CPUNET.hex --verify
+nrfjprog -f NRF53 --sectorerase --program mcuboot/zephyr/zephyr.hex --verify
+nrfjprog -f NRF53 --sectorerase --program zephyr/internal_flash_signed.hex --verify
+nrfjprog -f NRF53 --qspisectorerase --program zephyr/qspi_flash_signed.hex --qspiini <path_to>/Qspi.ini --verify
+nrfjprog -f NRF53 --reset
+```
+
+**Note:** The external flash chip must be connected to the dedicated QSPI peripheral port pins of the nRF5340, it is not possible to program an external flash chip connected to different pins using ``nrfjprog``.
+
 ## Integration with own projects
 
 The repository here serves as a starting point to add the QSPI XIP integration into other projects.
@@ -267,3 +307,7 @@ To debug this issue, you can use a debugger such as GDB to single-step through t
 Given that the QSPI flash ``init`` priority defaults to ``41`` at the ``POST_KERNEL`` level, take into account the following points:
 * There should be no QSPI flash residing code that has an ``init`` priority value that is less than or equal to the ``POST_KERNEL`` ``41`` level.
 * No interrupt handlers in the QSPI flash should be enabled until the QSPI flash driver has been initialized.
+
+### Module does not boot after update
+
+This issue can arise if there is a mismatch between the internal flash code and QSPI XIP code. Both slots must be running the same build to successfully boot. If one of the updates is not loaded, or a different build is loaded to one of the slots, or one of the updates loaded is corrupt and deleted, then the application will fail to boot.
