@@ -1,24 +1,27 @@
 # QSPI XIP with internal flash application support
 
-This repository demonstrates a way of splitting an application for the nRF5340 to partially reside on internal flash and partially on QSPI.
+This repository demonstrates a way of splitting an application for nRF5340 so that it partially resides on internal flash and partially on QSPI.
+The repository includes a sample application that shows how this functionality can be used in other projects and how it can be set up.
 
 ## Requirements
 
-The following requirements are needed to use and adapt this to your project:
+The following is needed for adapting the sample application to your project:
 
-* nRF5340-based board with SPI flash chip attached via dedicated QSPI peripheral (does not have to run in QSPI mode, can run in SPI or DSPI modes also), dts correctly configured for the connected flash chip
-* Network core application
-* Application core application
-* Static partition manager configuration file with internal flash and QSPI flash correctly partitioned
-* Linker file setup to specify location of QSPI XIP code
-* Code relocation in cmake to specify what files to relocate to QSPI XIP
-* MCUboot as bootloader
+* One nRF5340-based board with SPI flash chip attached through a dedicated QSPI peripheral, with DTS correctly configured for the connected flash chip.
+  The board does not have to run in the QSPI mode; can run in the SPI or DSPI modes also.
+* An application for the network core.
+* An application for the application core.
+* A static partition manager configuration file, with the internal flash and the QSPI flash correctly partitioned.
+* A linker file that is set up to specify the location of the QSPI XIP code.
+* Code relocation in CMake to specify what files to relocate to QSPI XIP.
+* MCUboot set up as bootloader.
 
-This repository serves as a sample application demonstrating how this functionality can be used in other projects and shows how the above can be setup.
+### QSPI flash setup
 
-### QSPI flash:
+You must correctly set up the QSPI flash chip in the board devicetree file, including the operating mode.
+The flash chip does not have to run in the QSPI mode for XIP to function, but using the mode will reduce the execution speed of the application.
 
-The QSPI flash chip must be correctly setup in the board devicetree file, this includes the operating mode, the flash chip does not have to run in QSPI mode for XIP to function, but will reduce execution speed of the application. An example of a configuration for the thingy53 which supports DSPI is provided:
+The following snippet shows an example of the configuration for Nordic Thingy:53 that supports DSPI:
 
 ```
 &qspi {
@@ -47,11 +50,22 @@ The QSPI flash chip must be correctly setup in the board devicetree file, this i
 };
 ```
 
-**Note:** Due to YOPAN-159 the QSPI peripheral must be ran with HFCLK192MCTRL=0, setting this to any other value may cause undefined operation of the device.
+**Note:** Due to YOPAN-159, the QSPI peripheral must be ran with ``HFCLK192MCTRL=0``.
+Setting this to any other value may cause undefined operation of the device.
 
-### Static partition manager:
+### Static partition manager setup
 
-A partition manager static configuration must be created which has 3 images of 2 slots each, the first slot is where the internal flash portion of the application will be, the second slot is for the network core update, and third slot is where the QSPI XIP porition of the application will be, these slots should be named "mcuboot_primary" and "mcuboot_secondary", "mcuboot_primary_1" and "mcuboot_secondary_1", "mcuboot_primary_2" and "mcuboot_secondary_2". An example static PM file is given:
+You must create a static configuration for the partition manager.
+This configuration must have 3 images of 2 slots each:
+
+* The first set of slots is for the internal flash portion of the application.
+  These slots should be named ``mcuboot_primary`` and ``mcuboot_secondary``.
+* The second set of slots is for the network core update.
+  These slots should be named ``mcuboot_primary_1`` and ``mcuboot_secondary_1``.
+* The third set of slots is for the QSPI XIP portion of the application.
+  These slots should be named ``mcuboot_primary_2`` and ``mcuboot_secondary_2``.
+
+The following snippet shows an example of the static configuration for the partition manager:
 
 ```
 app:
@@ -130,9 +144,13 @@ sram_primary:
   size: 0x40000
 ```
 
-### Linker file:
+### Linker file setup
 
-The linker file must specify the start address and size of the QSPI XIP region, for the nRF5340, the XIP peripheral is mapped to 0x10000000 which corresponds to 0x0 in the QSPI flash chip - the QSPI peripheral supports an offset address but this is not supported in this mode. The location should be offset by the value of "mcuboot_primary_2" and "mcuboot_pad" as an MCUboot header needs to be prepended to the image. An example file is provided:
+In the linker file, you must specify the start address and the size of the QSPI XIP region.
+For nRF5340, the XIP peripheral is mapped to ``0x10000000``, which corresponds to ``0x0`` in the QSPI flash chip (the QSPI peripheral supports an offset address, but this is not supported in this mode.)
+Make sure to offset the location by the value of ``mcuboot_primary_2`` and ``mcuboot_pad``, as an MCUboot header needs to be prepended to the image.
+
+The following snippet shows an example of the file configuration:
 
 ```
 #include <zephyr/linker/sections.h>
@@ -148,29 +166,46 @@ MEMORY
 #include <zephyr/arch/arm/aarch32/cortex_m/scripts/linker.ld>
 ```
 
-### Code relocation:
+### Code relocation setup
 
-Relocating code to QSPI XIP is part of the projects CMakeLists.txt file, relocation can be done on a file or library basis using the zephyr_code_relocate() function. For example, to relocate a file in the application:
+Relocating code to QSPI XIP is part of the project's ``CMakeLists.txt`` file.
+You can set up the relocation on a file or library basis using the ``zephyr_code_relocate()`` function.
+
+For example, to relocate a file in the application, you can use the following configuration:
 
 ```
 zephyr_code_relocate(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/bluetooth.c LOCATION EXTFLASH_TEXT NOCOPY)
 zephyr_code_relocate(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/bluetooth.c LOCATION RAM_DATA)
 ```
 
-### MCUboot:
+### MCUboot setup
 
-MCUboot must be configured for 3 images which correspond to:
+You must configure MCUboot for 3 images, corresponding to the following areas:
 
 1. Internal flash
 2. Network core
 3. QSPI flash
 
-Partial updates of either the internal flash or QSPI flash are not supported and will likely cause the module to fault, updates of both sections are required when performing a firmware update.
+Partial updates of either the internal flash or the QSPI flash are not supported and will likely cause the module to fault.
+You must update both sections when performing a firmware update.
 
-### Firmware updates:
+### Firmware update setup
 
 TODO
 
-### Troubleshooting:
+### Troubleshooting
 
-A common issue when using QSPI XIP in an application is that the module does not appear to start, or faults continously before the application can run, this is likely to be caused by an init priority of code residing on the QSPI flash being lower than the init priority of the QSPI flash device itself. To debug this issue, a debugger such as gdb can be used to single step through the application code until either a QSPI address is encountered, at which point the backtrace functionality can show what part of the code is responsible for this, and init priority of that module adjusted accordingly. The QSPI flash init priority defaults to 41 at the POST_KERNEL level, there should be no QSPI flash residing code that has an init priority value that is less than or equal to this, and no interrupt handlers in QSPI flash should be enabled until the QSPI flash driver has been initialised.
+Here are solutions to some common issues.
+
+#### Module does not appear to start
+
+A common issue when using QSPI XIP in an application is that the module does not appear to start or continously ends in a fault before the application can run.
+
+This is likely to be caused by priority mismatch: the ``init`` priority of the code residing on the QSPI flash is lower than the ``init`` priority of the QSPI flash device itself.
+
+To debug this issue, you can use a debugger such as GDB to single-step through the application code until a QSPI address is encountered. At that point, the backtrace functionality can show what part of the code is responsible for the issue, and you can adjust the ``init`` priority of that module accordingly.
+
+Given that the QSPI flash ``init`` priority defaults to ``41`` at the ``POST_KERNEL`` level, take into account the following points:
+
+* There should be no QSPI flash residing code that has an ``init`` priority value that is less than or equal to the ``POST_KERNEL`` level.
+* No interrupt handlers in the QSPI flash should be enabled until the QSPI flash driver has been initialized.
