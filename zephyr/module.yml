@@ -1,4 +1,5 @@
 build:
   kconfig: Kconfig
+  cmake: .
   settings:
     module_ext_root: .
