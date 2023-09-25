@@ -3,7 +3,11 @@
 This repository demonstrates a way of splitting an application for nRF5340 so that it partially resides on internal flash and partially on QSPI.
 The repository includes a sample application that shows how this functionality can be used in other projects and how it can be set up.
 
-## Requirements
+## Getting the code
+
+Follow the instructions on the [nRF Connect SDK documentation page](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/installation/installing.html) to get the required tools. For the step 4 ("Get the nRF Connect SDK code"), you must instead use this repository's URL: `west init -m https://github.com/NordicPlayground/ncs-nrf5340-xip-app.git`.
+
+## Requirements and setup
 
 The following is needed for adapting the sample application to your project:
 
@@ -50,7 +54,7 @@ The following snippet shows an example of the configuration for Nordic Thingy:53
 };
 ```
 
-**Note:** Due to YOPAN-159, the QSPI peripheral must be ran with ``HFCLK192MCTRL=0``.
+**Note:** Due to a QSPI peripheral product anomaly, the QSPI peripheral must be ran with ``HFCLK192MCTRL=0``.
 Setting this to any other value may cause undefined operation of the device.
 
 ### Static partition manager setup
@@ -69,79 +73,106 @@ The following snippet shows an example of the static configuration for the parti
 
 ```
 app:
-  address: 0x20200
+  address: 0x10200
+  end_address: 0xe4000
   region: flash_primary
-  size: 0xdfe00
+  size: 0xd3e00
+external_flash:
+  address: 0x120000
+  device: MX25R64
+  end_address: 0x800000
+  region: external_flash
+  size: 0x6e0000
 mcuboot:
   address: 0x0
-  end_address: 0x20000
+  end_address: 0x10000
   region: flash_primary
-  size: 0x20000
+  size: 0x10000
 mcuboot_pad:
-  address: 0x20000
+  address: 0x10000
+  end_address: 0x10200
   region: flash_primary
   size: 0x200
 mcuboot_primary:
-  address: 0x20000
+  address: 0x10000
+  end_address: 0xf0000
   orig_span: &id001
   - mcuboot_pad
   - app
-  end_address: 0x100000
   region: flash_primary
   size: 0xe0000
   span: *id001
+mcuboot_primary_1:
+  address: 0x0
+  device: flash_ctrl
+  end_address: 0x40000
+  region: ram_flash
+  size: 0x40000
 mcuboot_primary_app:
-  address: 0x20200
+  address: 0x10200
+  end_address: 0xf0000
   orig_span: &id002
   - app
-  end_address: 0x100000
   region: flash_primary
   size: 0xdfe00
   span: *id002
-mcuboot_primary_1:
-  address: 0x0
-  size: 0x40000
-  device: flash_ctrl
-  region: ram_flash
-mcuboot_primary_2:
-  address: 0x00000
-  end_address: 0xe000
-  device: MX25R64
-  region: external_flash
-  size: 0xe0000
 mcuboot_secondary:
-  address: 0xe0000
-  end_address: 0x1c0000
+  address: 0x0
   device: MX25R64
-  region: external_flash
-  size: 0xe0000
-mcuboot_secondary_2:
-  address: 0x1c0000
-  end_address: 0x2a0000
-  device: MX25R64
+  end_address: 0xe0000
   region: external_flash
   size: 0xe0000
 mcuboot_secondary_1:
-  address: 0x2a0000
-  end_address: 0x2e0000
+  address: 0xe0000
   device: MX25R64
+  end_address: 0x120000
   region: external_flash
   size: 0x40000
-external_flash_urd:
-  address: 0x2e0000
-  size: 0x100000
+mcuboot_primary_2:
+  address: 0x120000
   device: MX25R64
+  end_address: 0x160000
   region: external_flash
-external_flash:
-  address: 0x3e0000
-  size: 0x420000
+  size: 0x40000
+mcuboot_secondary_2:
+  address: 0x160000
   device: MX25R64
+  end_address: 0x1a0000
   region: external_flash
-sram_primary:
+  size: 0x40000
+otp:
+  address: 0xff8100
+  end_address: 0xff83fc
+  region: otp
+  size: 0x2fc
+pcd_sram:
   address: 0x20000000
-  end_address: 0x20040000
+  end_address: 0x20002000
   region: sram_primary
-  size: 0x40000
+  size: 0x2000
+ram_flash:
+  address: 0x40000
+  end_address: 0x40000
+  region: ram_flash
+  size: 0x0
+rpmsg_nrf53_sram:
+  address: 0x20070000
+  end_address: 0x20080000
+  placement:
+    before:
+    - end
+  region: sram_primary
+  size: 0x10000
+settings_storage:
+  address: 0xf0000
+  end_address: 0x100000
+  region: flash_primary
+  size: 0x10000
+sram_primary:
+  address: 0x20002000
+  end_address: 0x20070000
+  region: sram_primary
+  size: 0x6e000
 ```
 
 ### Linker file setup
@@ -191,9 +222,37 @@ You must update both sections when performing a firmware update.
 
 ### Firmware update setup
 
-TODO
+You can apply firmware updates using the following methods:
 
-### Troubleshooting
+* Using MCUmgr if the application has enabled it.
+* Using MCUboot serial recovery, via UART, using the `*_update.bin` files.
+* Using Bluetooth LE through the nRF Connect app for iOS or Android by using the `dfu_application.zip` file.
+
+## Integration with own projects
+
+The repository here serves as a starting point to add the QSPI XIP integration into other projects.
+The way to do this is to use this repository as the basis for your own project manifest repository so that the CMake code and Kconfig configuration is available.
+
+Pay attention to the following points:
+
+* The included samples `smp_svr` and `zigbee_weather_station` can be removed, but all other files should be kept.
+* The manifest can be freely updated to include other modules, update the NCS revision, or retract which modules of NCS are cloned. However, it must not use a revision older than `18682391decaaa989c362ec8c5b65fd6203a5fdb`.
+* A partition manager static configuration file must be provided for your application. You can check its example configuration in the [section above](#static-partition-manager-setup). This configuration must include 3 images of 2 slots each, whereby the third is located in QSPI.
+* A linker file must also be provided for your application. You can check its example configuration in the [section above](#linker-file-setup). This must have the start and end addresses of the QSPI XIP memory region where code starts and ends, including offsets for the MCUboot header, among others. This should be placed in the root of your application folder, in the same directory where the `CMakeLists.txt` file is located.
+* The following Kconfig configuration must be set for your application:
+
+  ```
+  CONFIG_CODE_DATA_RELOCATION=y
+  CONFIG_HAVE_CUSTOM_LINKER_SCRIPT=y
+  CONFIG_CUSTOM_LINKER_SCRIPT="linker_arm_nocopy.ld" # Change this if you have named your linker script differently
+  CONFIG_BUILD_NO_GAP_FILL=y
+  CONFIG_XIP=y
+  CONFIG_NORDIC_QSPI_NOR_XIP=y
+  CONFIG_UPDATEABLE_IMAGE_NUMBER=3
+  CONFIG_XIP_SPLIT_IMAGE=y
+  ```
+
+## Troubleshooting
 
 Here are solutions to some common issues.
 
