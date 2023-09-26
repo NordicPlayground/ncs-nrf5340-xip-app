@@ -11,6 +11,9 @@ cmake_minimum_required(VERSION 3.20.0)
 # The application uses the configuration/<board> scheme for configuration files.
 set(APPLICATION_CONFIG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/configuration/\${BOARD}")
 
+# Specify partition manager file
+set(PM_STATIC_YML_FILE "${CMAKE_CURRENT_SOURCE_DIR}/pm_static.yml")
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(ZigbeeWeatherStation)
 
