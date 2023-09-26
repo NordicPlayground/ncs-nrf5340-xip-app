@@ -234,7 +234,7 @@ When flashing applications using ``west``, this will invoke the ``nrfjprog`` run
 This runner will use the system default configuration that will configure the application in the QSPI mode (when flashing the external flash).
 This behavior can be changed using a custom ``Qspi.ini`` configuration file, but this will prevent flashing from being performed using ``west``. A sample ``Qspi.ini`` file is provided in the root of this repository. The file is set up to work on Nordic Thingy:53. If you decide to use the ``Qspi.ini`` file, the HEX files in the repository need to be manually flashed. For example, for the ``zigbee_weather_station`` application, the files to flash are the following (paths are relative to the build directory):
 
-* multiprotocol_rpmsg/zephyr/merged_CPUNET.hex
+* 802154_rpmsg/zephyr/merged_CPUNET.hex
 * mcuboot/zephyr/zephyr.hex
 * zephyr/internal_flash_signed.hex
 * zephyr/qspi_flash_signed.hex
@@ -249,7 +249,7 @@ For the ``smp_svr`` sample application, the files to flash are the following:
 The follow commands can be used to flash and verify the application for ``zigbee_weather_station`` (adjusting the path to the ini file):
 
 ```
-nrfjprog -f NRF53 --coprocessor CP_NETWORK --sectorerase --program multiprotocol_rpmsg/zephyr/merged_CPUNET.hex --verify
+nrfjprog -f NRF53 --coprocessor CP_NETWORK --sectorerase --program 802154_rpmsg/zephyr/merged_CPUNET.hex --verify
 nrfjprog -f NRF53 --sectorerase --program mcuboot/zephyr/zephyr.hex --verify
 nrfjprog -f NRF53 --sectorerase --program zephyr/internal_flash_signed.hex --verify
 nrfjprog -f NRF53 --qspisectorerase --program zephyr/qspi_flash_signed.hex --qspiini <path_to>/Qspi.ini --verify
