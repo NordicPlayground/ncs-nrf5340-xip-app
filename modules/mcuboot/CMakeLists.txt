@@ -790,21 +790,39 @@ if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD)
   set(dfu_multi_image_paths)
   set(dfu_multi_image_targets)
 
-        if(CONFIG_XIP_SPLIT_IMAGE)
-          message(FATAL_ERROR "This build configuration is not supported:
-CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD cannot be used with CONFIG_XIP_SPLIT_IMAGE.")
-        endif()
+  if (CONFIG_XIP_SPLIT_IMAGE)
 
-  if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_APP)
-    list(APPEND dfu_multi_image_ids 0)
-    list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${app_core_binary_name}")
-    list(APPEND dfu_multi_image_targets mcuboot_sign_target)
-  endif()
 
-  if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_NET)
-    list(APPEND dfu_multi_image_ids 1)
-    list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${net_core_binary_name}")
-    list(APPEND dfu_multi_image_targets net_core_app_sign_target)
+    if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_APP)
+      list(APPEND dfu_multi_image_ids 0)
+      list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/internal_flash_update.bin")
+      list(APPEND dfu_multi_image_targets mcuboot_sign_target)
+    endif()
+
+    if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_NET)
+      list(APPEND dfu_multi_image_ids 1)
+      list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${net_core_binary_name}")
+      list(APPEND dfu_multi_image_targets net_core_app_sign_target)
+    endif()
+
+    list(APPEND dfu_multi_image_ids 2)
+    list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/qspi_flash_update.bin")
+
+
+  else()
+
+    if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_APP)
+      list(APPEND dfu_multi_image_ids 0)
+      list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${app_core_binary_name}")
+      list(APPEND dfu_multi_image_targets mcuboot_sign_target)
+    endif()
+
+    if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_NET)
+      list(APPEND dfu_multi_image_ids 1)
+      list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${net_core_binary_name}")
+      list(APPEND dfu_multi_image_targets net_core_app_sign_target)
+    endif()
+
   endif()
 
   if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_MCUBOOT)
