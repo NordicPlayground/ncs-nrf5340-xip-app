@@ -20,6 +20,13 @@
 #include <zephyr/usb/usb_device.h>
 #endif /* CONFIG_USB_DEVICE_STACK */
 
+#if CONFIG_ZIGBEE_FOTA
+#include <zigbee/zigbee_fota.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/dfu/mcuboot.h>
+
+#endif /* CONFIG_ZIGBEE_FOTA */
+
 #include "weather_station.h"
 
 /* Delay for console initialization */
@@ -39,6 +46,9 @@
 #define LED_RED DK_LED1
 #define LED_GREEN DK_LED2
 #define LED_BLUE DK_LED3
+
+/* LED indicating OTA Client Activity. */
+#define OTA_ACTIVITY_LED LED_GREEN
 
 /* LED indicating that device successfully joined Zigbee network */
 #define ZIGBEE_NETWORK_STATE_LED LED_BLUE
@@ -113,11 +123,19 @@ ZB_HA_DECLARE_WEATHER_STATION_EP(
 	WEATHER_STATION_ENDPOINT_NB,
 	weather_station_cluster_list);
 
-/* Device context */
-ZBOSS_DECLARE_DEVICE_CTX_1_EP(
-	weather_station_ctx,
-	weather_station_ep);
 
+#ifndef CONFIG_ZIGBEE_FOTA
+ZBOSS_DECLARE_DEVICE_CTX_1_EP(weather_station_ctx, weather_station_ep);
+#else
+  #if WEATHER_STATION_ENDPOINT_NB == CONFIG_ZIGBEE_FOTA_ENDPOINT
+    #error "Weather Station and Zigbee OTA endpoints should be different."
+  #endif
+
+extern zb_af_endpoint_desc_t zigbee_fota_client_ep;
+ZBOSS_DECLARE_DEVICE_CTX_2_EP(weather_station_ctx,
+			      zigbee_fota_client_ep,
+			      weather_station_ep);
+#endif /* CONFIG_ZIGBEE_FOTA */
 
 static void mandatory_clusters_attr_init(void)
 {
@@ -320,6 +338,101 @@ static void check_weather(zb_bufid_t bufid)
 	}
 }
 
+#ifdef CONFIG_ZIGBEE_FOTA
+static void confirm_image(void)
+{
+	if (!boot_is_img_confirmed()) {
+		int ret = boot_write_img_confirmed();
+
+		if (ret) {
+			LOG_ERR("Couldn't confirm image: %d", ret);
+		} else {
+			LOG_INF("Marked image as OK");
+		}
+	}
+}
+
+static void ota_evt_handler(const struct zigbee_fota_evt *evt)
+{
+	switch (evt->id) {
+	case ZIGBEE_FOTA_EVT_PROGRESS:
+		dk_set_led(OTA_ACTIVITY_LED, evt->dl.progress % 2);
+		break;
+
+	case ZIGBEE_FOTA_EVT_FINISHED:
+		LOG_INF("Reboot application.");
+		/* Power on unused sections of RAM to allow MCUboot to use it. */
+		if (IS_ENABLED(CONFIG_RAM_POWER_DOWN_LIBRARY)) {
+			power_up_unused_ram();
+		}
+
+		sys_reboot(SYS_REBOOT_COLD);
+		break;
+
+	case ZIGBEE_FOTA_EVT_ERROR:
+		LOG_ERR("OTA image transfer failed.");
+		break;
+
+	default:
+		break;
+	}
+}
+
+/**@brief Callback function for handling ZCL commands.
+ *
+ * @param[in]   bufid   Reference to Zigbee stack buffer
+ *                      used to pass received data.
+ */
+static void zcl_device_cb(zb_bufid_t bufid)
+{
+	zb_zcl_device_callback_param_t *device_cb_param =
+		ZB_BUF_GET_PARAM(bufid, zb_zcl_device_callback_param_t);
+
+	if (device_cb_param->device_cb_id == ZB_ZCL_OTA_UPGRADE_VALUE_CB_ID) {
+		zigbee_fota_zcl_cb(bufid);
+	} else {
+		device_cb_param->status = RET_NOT_IMPLEMENTED;
+	}
+}
+
+/**@brief Function to toggle the identify LED.
+ *
+ * @param  bufid  Unused parameter, required by ZBOSS scheduler API.
+ */
+static void toggle_identify_led_fota(zb_bufid_t bufid)
+{
+	static int blink_status;
+
+	dk_set_led(IDENTIFY_LED, (++blink_status) % 2);
+	ZB_SCHEDULE_APP_ALARM(toggle_identify_led_fota, bufid, ZB_MILLISECONDS_TO_BEACON_INTERVAL(100));
+}
+
+/**@brief Function to handle identify notification events on the first endpoint.
+ *
+ * @param  bufid  Unused parameter, required by ZBOSS scheduler API.
+ */
+static void identify_cb(zb_bufid_t bufid)
+{
+	zb_ret_t zb_err_code;
+
+	if (bufid) {
+		/* Schedule a self-scheduling function that will toggle the LED. */
+		ZB_SCHEDULE_APP_CALLBACK(toggle_identify_led_fota, bufid);
+	} else {
+		/* Cancel the toggling function alarm and turn off LED. */
+		zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(toggle_identify_led_fota, ZB_ALARM_ANY_PARAM);
+		ZVUNUSED(zb_err_code);
+
+		/* Update network status/idenitfication LED. */
+		if (ZB_JOINED()) {
+			dk_set_led_on(ZIGBEE_NETWORK_STATE_LED);
+		} else {
+			dk_set_led_off(ZIGBEE_NETWORK_STATE_LED);
+		}
+	}
+}
+#endif /* CONFIG_ZIGBEE_FOTA */
+
 void zboss_signal_handler(zb_bufid_t bufid)
 {
 	zb_zdo_app_signal_hdr_t *signal_header = NULL;
@@ -330,6 +443,11 @@ void zboss_signal_handler(zb_bufid_t bufid)
 	#ifdef CONFIG_LOG
 	zigbee_led_status_update(bufid, ZIGBEE_NETWORK_STATE_LED);
 	#endif /* CONFIG_LOG */
+
+#ifdef CONFIG_ZIGBEE_FOTA
+	/* Pass signal to the OTA client implementation. */
+	zigbee_fota_signal_handler(bufid);
+#endif /* CONFIG_ZIGBEE_FOTA */
 
 	/* Detect ZBOSS startup */
 	switch (signal) {
@@ -361,6 +479,8 @@ void zboss_signal_handler(zb_bufid_t bufid)
 
 int main(void)
 {
+	int blink_status = 0;
+
 	#ifdef CONFIG_USB_DEVICE_STACK
 	wait_for_console();
 	#endif /* CONFIG_USB_DEVICE_STACK */
@@ -368,6 +488,17 @@ int main(void)
 	register_factory_reset_button(FACTORY_RESET_BUTTON);
 	gpio_init();
 	weather_station_init();
+
+#ifdef CONFIG_ZIGBEE_FOTA
+	/* Initialize Zigbee FOTA download service. */
+	zigbee_fota_init(ota_evt_handler);
+
+	/* Mark the current firmware as valid. */
+	confirm_image();
+
+	/* Register callback for handling ZCL commands. */
+	ZB_ZCL_REGISTER_DEVICE_CB(zcl_device_cb);
+#endif /* CONFIG_ZIGBEE_FOTA */
 
 	/* Register device context (endpoint) */
 	ZB_AF_REGISTER_DEVICE_CTX(&weather_station_ctx);
@@ -380,6 +511,10 @@ int main(void)
 
 	/* Register callback to identify notifications */
 	ZB_AF_SET_IDENTIFY_NOTIFICATION_HANDLER(WEATHER_STATION_ENDPOINT_NB, identify_callback);
+
+#ifdef CONFIG_ZIGBEE_FOTA
+	ZB_AF_SET_IDENTIFY_NOTIFICATION_HANDLER(CONFIG_ZIGBEE_FOTA_ENDPOINT, identify_cb);
+#endif /* CONFIG_ZIGBEE_FOTA */
 
 	/* Enable Sleepy End Device behavior */
 	zb_set_rx_on_when_idle(ZB_FALSE);
