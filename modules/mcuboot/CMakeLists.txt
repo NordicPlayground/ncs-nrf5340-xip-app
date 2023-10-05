@@ -208,13 +208,21 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
     #
     # Required arguments are:
     # ELF_FILE_IN
-    # ELF_SECTION_NAME
+    # ELF_SECTION_NAMES
     # HEX_INCLUDE_FILE_OUT
     # HEX_EXCLUDE_FILE_OUT
-    set(oneValueArgs ELF_FILE_IN ELF_SECTION_NAME HEX_INCLUDE_FILE_OUT HEX_EXCLUDE_FILE_OUT)
-    set(multiValueArgs DEPENDS)
+    set(oneValueArgs ELF_FILE_IN HEX_INCLUDE_FILE_OUT HEX_EXCLUDE_FILE_OUT)
+    set(multiValueArgs ELF_SECTION_NAMES DEPENDS)
     cmake_parse_arguments(SPLIT_ARG "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    check_arguments_required_all(split SPLIT_ARG ${oneValueArgs})
+    check_arguments_required_all(split SPLIT_ARG ${oneValueArgs} ELF_SECTION_NAMES)
+
+    set(include_param)
+    set(exclude_param)
+
+    foreach(section_name ${SPLIT_ARG_ELF_SECTION_NAMES})
+      set(include_param ${include_param} -R ${section_name})
+      set(exclude_param ${exclude_param} -j ${section_name})
+    endforeach()
 
     add_custom_command(
       OUTPUT
@@ -223,7 +231,7 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
       COMMAND
       ${CMAKE_OBJCOPY}
       --output-target=ihex
-      -R \"${SPLIT_ARG_ELF_SECTION_NAME}\"
+      ${include_param}
       ${SPLIT_ARG_ELF_FILE_IN}
       ${SPLIT_ARG_HEX_INCLUDE_FILE_OUT}
 
@@ -238,7 +246,7 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
       COMMAND
       ${CMAKE_OBJCOPY}
       --output-target=ihex
-      -j "${SPLIT_ARG_ELF_SECTION_NAME}"
+      ${exclude_param}
       ${SPLIT_ARG_ELF_FILE_IN}
       ${SPLIT_ARG_HEX_EXCLUDE_FILE_OUT}
 
@@ -434,7 +442,7 @@ if(CONFIG_BOOTLOADER_MCUBOOT)
     if(CONFIG_XIP_SPLIT_IMAGE)
       split(
         ELF_FILE_IN ${PROJECT_BINARY_DIR}/${KERNEL_ELF_NAME}
-        ELF_SECTION_NAME "_EXTFLASH_TEXT_SECTION_NAME"
+        ELF_SECTION_NAMES "_EXTFLASH_TEXT_SECTION_NAME;_EXTFLASH_RODATA_SECTION_NAME"
         HEX_INCLUDE_FILE_OUT ${PROJECT_BINARY_DIR}/internal_flash.hex
         HEX_EXCLUDE_FILE_OUT ${PROJECT_BINARY_DIR}/qspi_flash.hex
         DEPENDS ${app_sign_depends} ${PROJECT_BINARY_DIR}/${KERNEL_ELF_NAME}
