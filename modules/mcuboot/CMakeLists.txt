@@ -797,6 +797,10 @@ if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD)
       list(APPEND dfu_multi_image_ids 0)
       list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/internal_flash_update.bin")
       list(APPEND dfu_multi_image_targets mcuboot_sign_target)
+
+      # Add part of of APP core image to be put in external flash
+      list(APPEND dfu_multi_image_ids 2)
+      list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/qspi_flash_update.bin")
     endif()
 
     if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_NET)
@@ -804,10 +808,6 @@ if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD)
       list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/${net_core_binary_name}")
       list(APPEND dfu_multi_image_targets net_core_app_sign_target)
     endif()
-
-    list(APPEND dfu_multi_image_ids 2)
-    list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/qspi_flash_update.bin")
-
 
   else()
 
