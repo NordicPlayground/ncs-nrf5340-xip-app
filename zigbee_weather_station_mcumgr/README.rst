@@ -181,7 +181,7 @@ Besides initialization logs, the following sets of measurement-related data are 
 Building and running
 ********************
 
-.. |application path| replace:: :file:`applications/zigbee_weather_station`
+.. |application path| replace:: :file:`zigbee_weather_station_mcumgr`
 
 .. include:: /includes/application_build_and_run.txt
 
