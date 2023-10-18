@@ -792,7 +792,6 @@ if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_BUILD)
 
   if (CONFIG_XIP_SPLIT_IMAGE)
 
-
     if (CONFIG_DFU_MULTI_IMAGE_PACKAGE_APP)
       list(APPEND dfu_multi_image_ids 0)
       list(APPEND dfu_multi_image_paths "${PROJECT_BINARY_DIR}/internal_flash_update.bin")
