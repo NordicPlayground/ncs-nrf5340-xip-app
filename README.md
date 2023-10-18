@@ -191,7 +191,7 @@ The following snippet shows an example of the file configuration:
 
 MEMORY
 {
-     EXTFLASH (wx) : ORIGIN = 0x10120200, LENGTH = 0xFFE00
+     EXTFLASH (wx) : ORIGIN = 0x10120200, LENGTH = 0x3FE00
 }
 
 #include <zephyr/arch/arm/aarch32/cortex_m/scripts/linker.ld>
